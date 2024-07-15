@@ -1,0 +1,23 @@
+{
+  "name": "nft-generator",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "clean-output": "node -e \"const fs = require('fs'); fs.existsSync('NFTS') && fs.rmdirSync('NFTS', { recursive: true }); fs.mkdirSync('NFTS');\"",
+    "start": "npm run clean-output && ts-node src/index.ts"
+  },
+  "dependencies": {
+    "fs-extra": "^11.2.0",
+    "recursive-readdir-sync": "^1.0.6"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
