@@ -13,6 +13,7 @@ const readline = require('readline').createInterface({
 // *** FOLDER STRUCTURE VARIABLES
 const ASSETS_PATH = JOIN(__dirname, 'assets');
 const OUTPUT_PATH = JOIN(__dirname, 'NFTS');
+let imageCount = 1;
 
 
 /**
@@ -61,18 +62,21 @@ async function displayImagesStatus(imageFiles: any, copiesPerImage: number, addt
  */
 async function generateCopies(imageFiles: any, copiesPerImage: number, addtionalCopies: number) {
 
-    const copyImage = async (imageFile: any, i: number, SOURCE_PATH: any) => {
-        const DESTINATION_PATH = JOIN(OUTPUT_PATH, `${i + 1}-${imageFile.name}`);
+    const copyImage = async (imageFile: any, SOURCE_PATH: any) => {
+        const imageExtension = imageFile.name.endsWith('.jpg') ? '.jpg' : '.jpeg';
 
-        console.log("\x1b[34m", `--> Copying Image: ${imageFile.name} (copy ${i + 1})`, "\x1b[0m");
+        const DESTINATION_PATH = JOIN(OUTPUT_PATH, `${imageCount}${imageExtension}`);
 
+        console.log("\x1b[34m", `--> Copying Image: ${imageFile.name} (copy ${imageCount})`, "\x1b[0m");
+
+        imageCount++;
         await fse.copy(SOURCE_PATH, DESTINATION_PATH);
     }
 
     for (const imageFile of imageFiles) {
         const SOURCE_PATH = JOIN(ASSETS_PATH, imageFile.name);
 
-        for (let i = 0; i < copiesPerImage; i++) { copyImage(imageFile, i, SOURCE_PATH); }
+        for (let i = 0; i < copiesPerImage; i++) { copyImage(imageFile, SOURCE_PATH); }
     }
 
     // copying over the first element to make sure final count is correct
@@ -81,7 +85,7 @@ async function generateCopies(imageFiles: any, copiesPerImage: number, addtional
         console.log("\x1b[32m", "re-Copying images to match final count");
         console.log("\x1b[32m", "----------------------------------------");
         const SOURCE_PATH = JOIN(ASSETS_PATH, imageFiles[0].name);
-        for (let i = 0; i < addtionalCopies; i++) { copyImage(imageFiles[0], MAX_IMAGE_COPIES + i, SOURCE_PATH); }
+        for (let i = 0; i < addtionalCopies; i++) { copyImage(imageFiles[0], SOURCE_PATH); }
     }
 
     console.log("\x1b[32m", "------------------------");
