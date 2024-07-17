@@ -13,7 +13,12 @@ const readline = require('readline').createInterface({
 // *** FOLDER STRUCTURE VARIABLES
 const ASSETS_PATH = JOIN(__dirname, 'assets');
 const OUTPUT_PATH = JOIN(__dirname, 'NFTS');
+
+// *** Chunk calculation VARIABLES
 let imageCount = 1;
+let numberOfChunks: number = 0;
+let extraImagesLeftToMatchCount: number = 0;
+let extraChunksCount: number = 0;
 
 
 /**
@@ -30,39 +35,52 @@ function filterOutUnwantedImageExtensions(found_images: any) {
 
 /**
  * @description
- * Helper function that displays a briefing regarding the assets folder (images to copy)
+ * Helmper method that takes care of calculating the number of copies per chunk
+ * based on the number of images, and the desired number of copies
  */
-async function displayImagesStatus(imageFiles: any, copiesPerImage: number, addtionalCopies: number) {
+function getChunksData(imageFiles: any) {
+    numberOfChunks = Math.floor(MAX_IMAGE_COPIES / imageFiles.length);
+    extraImagesLeftToMatchCount = MAX_IMAGE_COPIES - (numberOfChunks * imageFiles.length);
+    extraChunksCount = Math.ceil(extraImagesLeftToMatchCount / imageFiles.length);
+
     console.log("\x1b[32m", "------------------------");
     console.log("\x1b[32m", "      Images Status");
     console.log("\x1b[32m", "------------------------");
     console.log("\x1b[32m", "Total Images:", imageFiles.length);
-    console.log("\x1b[32m", "Copies Per Image:", copiesPerImage);
-    console.log("\x1b[32m", "Additional Copies:", addtionalCopies);
+    console.log("\x1b[32m", "-->", numberOfChunks, "chunks of", imageFiles.length, "image(s) each");
+    if (extraImagesLeftToMatchCount > 0)
+        console.log("\x1b[32m", "-->", extraImagesLeftToMatchCount, "additional images needed to match total count. (", extraChunksCount, "extra chunks)");
     console.log("\x1b[32m", "------------------------");
+}
 
-    const question = 'Press Enter to continue or any other key to cancel: ';
+/**
+ * @description
+ * Helmper method that takes care of displaying the info message
+ * and waiting for user confirmation
+ */
+async function displayImagesStatus(imageFiles: any) {
+
+    getChunksData(imageFiles);
+
+    const question = 'Press Enter to continue (other key to cancel): ';
 
     await new Promise<void>((resolve, reject) => {
         readline.question(question, (answer: any) => {
-            if (answer.toLowerCase() === '') {
-                resolve();
-            } else {
-                reject(new Error('User cancelled copying'));
-            }
+            if (answer.toLowerCase() === '') resolve();
+            else reject(new Error('User cancelled copying'));
             readline.close();
         });
     });
 }
 
-/**
- * @description
- * Helper function that takes care of genrating copies
- * based on the number of copies per image
- */
-async function generateCopies(imageFiles: any, copiesPerImage: number, addtionalCopies: number) {
 
-    const copyImage = async (imageFile: any, SOURCE_PATH: any) => {
+// *** ===============================================
+// *** ================ MAIN FUNCTIONS ===============
+// *** ===============================================
+
+function generateCopies(imageFiles: any) {
+
+    const copyOneImage = async (imageFile: any, SOURCE_PATH: any) => {
         const imageExtension = imageFile.name.endsWith('.jpg') ? '.jpg' : '.jpeg';
 
         const DESTINATION_PATH = JOIN(OUTPUT_PATH, `${imageCount}${imageExtension}`);
@@ -73,19 +91,29 @@ async function generateCopies(imageFiles: any, copiesPerImage: number, addtional
         await fse.copy(SOURCE_PATH, DESTINATION_PATH);
     }
 
-    for (const imageFile of imageFiles) {
-        const SOURCE_PATH = JOIN(ASSETS_PATH, imageFile.name);
+    for (let chunk = 0; chunk < numberOfChunks; chunk++) {
+        console.log("\x1b[32m", "----------------------------------------");
+        console.log("\x1b[32m", "Exploring CHUNK -", (chunk + 1), "of", numberOfChunks);
+        console.log("\x1b[32m", "----------------------------------------");
 
-        for (let i = 0; i < copiesPerImage; i++) { copyImage(imageFile, SOURCE_PATH); }
+        for (const imageFile of imageFiles) {
+            const SOURCE_PATH = JOIN(ASSETS_PATH, imageFile.name);
+            copyOneImage(imageFile, SOURCE_PATH);
+        }
     }
 
-    // copying over the first element to make sure final count is correct
-    if (addtionalCopies > 0) {
-        console.log("\x1b[32m", "----------------------------------------");
-        console.log("\x1b[32m", "re-Copying images to match final count");
-        console.log("\x1b[32m", "----------------------------------------");
-        const SOURCE_PATH = JOIN(ASSETS_PATH, imageFiles[0].name);
-        for (let i = 0; i < addtionalCopies; i++) { copyImage(imageFiles[0], SOURCE_PATH); }
+    if (extraImagesLeftToMatchCount > 0) {
+        for (let chunk = 0; chunk < extraChunksCount; chunk++) {
+            console.log("\x1b[32m", "----------------------------------------");
+            console.log("\x1b[32m", "Exploring EXTRA CHUNK -", (chunk + 1), "of", extraChunksCount);
+            console.log("\x1b[32m", "----------------------------------------");
+
+            for (let i = 0; i < extraImagesLeftToMatchCount; i++) {
+                const imageFile = imageFiles[i];
+                const SOURCE_PATH = JOIN(ASSETS_PATH, imageFile.name);
+                copyOneImage(imageFile, SOURCE_PATH);
+            }
+        }
     }
 
     console.log("\x1b[32m", "------------------------");
@@ -97,23 +125,10 @@ async function generateCopies(imageFiles: any, copiesPerImage: number, addtional
 // ** MAIN FUNCTION **
 (async function () {
 
-    await fse.ensureDirSync(OUTPUT_PATH);
-
     const found_images = fse.readdirSync(ASSETS_PATH, { withFileTypes: true });
 
     const imageFiles = filterOutUnwantedImageExtensions(found_images);
 
-    const copiesPerImage = Math.round(MAX_IMAGE_COPIES / imageFiles.length);
-    const addtionalCopies = MAX_IMAGE_COPIES % imageFiles.length;
-
-
-    if (copiesPerImage < 0) {
-        console.log("No copies needed as there are less images than desired NFTs.");
-        return;
-    }
-
-    displayImagesStatus(imageFiles, copiesPerImage, addtionalCopies)
-        .then(
-            async () => await generateCopies(imageFiles, copiesPerImage, addtionalCopies)
-        )
+    displayImagesStatus(imageFiles)
+        .then(async () => await generateCopies(imageFiles))
 })();
